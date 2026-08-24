@@ -11,6 +11,10 @@ const matches = {};
 
 // 5 minutes TTL
 const TTL_MS = 5 * 60 * 1000;
+// Uptime ping route
+app.get('/', (req, res) => {
+    res.send('Velocity Cloud Skins Server is Awake! 🚀');
+});
 
 app.post('/api/sync', (req, res) => {
     try {
