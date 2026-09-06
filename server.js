@@ -60,6 +60,37 @@ app.post('/api/sync', (req, res) => {
     }
 });
 
+// Radar sessions storage
+const radarSessions = {};
+
+// POST from CS2 DLL
+app.post('/api/radar', (req, res) => {
+    try {
+        const { session_id } = req.body;
+        if (!session_id) {
+            return res.status(400).json({ error: 'Missing session_id' });
+        }
+        
+        radarSessions[session_id] = {
+            lastUpdate: Date.now(),
+            data: req.body
+        };
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error in /api/radar:', err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Serve the radar static files
+app.use('/radar', express.static('public'));
+
+app.get('/radar-view', (req, res) => {
+    const path = require('path');
+    res.sendFile(path.join(__dirname, 'public', 'radar.html'));
+});
+
 // Cleanup routine
 setInterval(() => {
     const now = Date.now();
@@ -78,9 +109,45 @@ setInterval(() => {
             console.log(`Cleaned up empty match ${matchIp}`);
         }
     }
+
+    // Cleanup radar sessions (5 min without update)
+    for (const sessionId in radarSessions) {
+        if (now - radarSessions[sessionId].lastUpdate > TTL_MS) {
+            delete radarSessions[sessionId];
+        }
+    }
 }, 60 * 1000); // Check every minute
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`Cloud Skins Server running on port ${PORT}`);
 });
+
+// Setup WebSocket server sharing the same HTTP server
+const { WebSocketServer } = require('ws');
+const wss = new WebSocketServer({ server, path: '/radar-ws' });
+
+wss.on('connection', (ws, req) => {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const sessionId = url.searchParams.get('session');
+    
+    if (!sessionId) {
+        ws.close();
+        return;
+    }
+    
+    ws.sessionId = sessionId;
+});
+
+// Broadcast radar updates periodically instead of on every POST to save bandwidth
+setInterval(() => {
+    wss.clients.forEach(client => {
+        if (client.readyState === 1 && client.sessionId) {
+            const data = radarSessions[client.sessionId];
+            if (data && data.data) {
+                client.send(JSON.stringify(data.data));
+            }
+        }
+    });
+}, 250); // Broadcast ~4 times a second to connected clients
+
