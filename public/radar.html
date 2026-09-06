@@ -116,16 +116,139 @@
         .connected { background-color: #4caf50; }
         .disconnected { background-color: #f44336; }
     </style>
+        .main-wrapper {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            max-width: 1400px;
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #scoreboard-container {
+            flex: 1;
+            background: rgba(26, 28, 35, 0.85);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 800px;
+            overflow-y: auto;
+        }
+
+        .team-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .team-title {
+            font-size: 18px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .team-t .team-title { color: #ff5c5c; border-color: #ff5c5c; }
+        .team-ct .team-title { color: #5c9aff; border-color: #5c9aff; }
+
+        .score-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .score-table th {
+            text-align: left;
+            padding: 8px;
+            color: #888;
+            font-weight: normal;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .score-table td {
+            padding: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .score-table tr.dead {
+            opacity: 0.5;
+        }
+
+        .stat-val {
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .stat-money {
+            color: #4caf50;
+            font-family: monospace;
+        }
+
+        /* Custom scrollbar */
+        #scoreboard-container::-webkit-scrollbar { width: 6px; }
+        #scoreboard-container::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        #scoreboard-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+    </style>
 </head>
 <body>
-    <div id="radar-container">
-        <div id="status-overlay">
-            <span class="status-dot disconnected" id="conn-dot"></span>
-            <span id="conn-text">Connecting...</span>
-            <div id="map-name" style="margin-top: 5px; font-weight: bold; color: #aaa;">Map: Unknown</div>
+    <div class="main-wrapper">
+        <div id="radar-container">
+            <div id="status-overlay">
+                <span class="status-dot disconnected" id="conn-dot"></span>
+                <span id="conn-text">Connecting...</span>
+                <div id="map-name" style="margin-top: 5px; font-weight: bold; color: #aaa;">Map: Unknown</div>
+            </div>
+            <img id="map-image" src="" alt="Waiting for map data..." style="display: none;">
+            <div id="players-layer"></div>
         </div>
-        <img id="map-image" src="" alt="Waiting for map data..." style="display: none;">
-        <div id="players-layer"></div>
+
+        <div id="scoreboard-container">
+            <div class="team-section team-ct" id="team-ct">
+                <div class="team-title">Counter-Terrorists</div>
+                <table class="score-table">
+                    <thead>
+                        <tr>
+                            <th>Player</th>
+                            <th>$</th>
+                            <th>K</th>
+                            <th>A</th>
+                            <th>D</th>
+                            <th>HP</th>
+                            <th>ARM</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-ct"></tbody>
+                </table>
+            </div>
+
+            <div class="team-section team-t" id="team-t">
+                <div class="team-title">Terrorists</div>
+                <table class="score-table">
+                    <thead>
+                        <tr>
+                            <th>Player</th>
+                            <th>$</th>
+                            <th>K</th>
+                            <th>A</th>
+                            <th>D</th>
+                            <th>HP</th>
+                            <th>ARM</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-t"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -137,6 +260,8 @@
         const mapNameEl = document.getElementById('map-name');
         const mapImage = document.getElementById('map-image');
         const playersLayer = document.getElementById('players-layer');
+        const tbodyCt = document.getElementById('tbody-ct');
+        const tbodyT = document.getElementById('tbody-t');
 
         let ws;
 
@@ -176,6 +301,7 @@
                 try {
                     const data = JSON.parse(event.data);
                     updateRadar(data);
+                    updateScoreboard(data.players);
                 } catch (e) {
                     console.error("Invalid WS data", e);
                 }
@@ -260,6 +386,40 @@
                 hpFill.style.width = `${Math.min(100, Math.max(0, p.health))}%`;
                 hpFill.style.background = p.health > 50 ? '#4caf50' : (p.health > 20 ? '#ff9800' : '#f44336');
             });
+        }
+
+        function updateScoreboard(players) {
+            let htmlCt = '';
+            let htmlT = '';
+
+            // Sort players by Kills descending
+            const sortedPlayers = [...players].sort((a, b) => (b.kills || 0) - (a.kills || 0));
+
+            sortedPlayers.forEach(p => {
+                const team = p.team === 2 ? 't' : (p.team === 3 ? 'ct' : 'spec');
+                if (team === 'spec') return;
+
+                const row = `
+                    <tr class="${p.alive ? '' : 'dead'}">
+                        <td>${p.is_local ? '⭐ ' : ''}<b>${p.name}</b></td>
+                        <td class="stat-money">$${p.money || 0}</td>
+                        <td class="stat-val">${p.kills || 0}</td>
+                        <td>${p.assists || 0}</td>
+                        <td>${p.deaths || 0}</td>
+                        <td style="color: ${p.health > 50 ? '#4caf50' : (p.health > 20 ? '#ff9800' : '#f44336')}">${p.health}</td>
+                        <td>${p.armor || 0}</td>
+                    </tr>
+                `;
+
+                if (team === 'ct') {
+                    htmlCt += row;
+                } else if (team === 't') {
+                    htmlT += row;
+                }
+            });
+
+            tbodyCt.innerHTML = htmlCt;
+            tbodyT.innerHTML = htmlT;
         }
     </script>
 </body>
