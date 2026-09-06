@@ -138,14 +138,13 @@
         const mapImage = document.getElementById('map-image');
         const playersLayer = document.getElementById('players-layer');
 
+        let ws;
+
         if (!sessionId) {
             connText.innerText = "Error: Missing session ID in URL";
         } else {
             connectWs();
         }
-
-        let ws;
-        
         const MAP_CONFIGS = {
             "de_dust2": { x: -2476, y: 3239, scale: 4.4 },
             "de_mirage": { x: -3217, y: 1713, scale: 5.0 },
