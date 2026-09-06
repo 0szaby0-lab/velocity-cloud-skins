@@ -42,7 +42,7 @@
             border-radius: 50%;
             transform: translate(-50%, -50%);
             z-index: 10;
-            transition: all 0.2s linear;
+            transition: transform 0.2s linear;
         }
 
         .player-dot.t {
@@ -211,8 +211,8 @@
                 let screenX = (p.x - mapConfig.x) / mapConfig.scale;
                 let screenY = (mapConfig.y - p.y) / mapConfig.scale;
                 
-                const posX = (screenX / 1024) * 100;
-                const posY = (screenY / 1024) * 100;
+                const posX = (screenX / 1024) * 800;
+                const posY = (screenY / 1024) * 800;
 
                 let el = document.getElementById(`player-${p.name}`);
                 if (!el) {
@@ -220,6 +220,8 @@
                     el.id = `player-${p.name}`;
                     el.dataset.id = p.name;
                     el.className = 'player-dot';
+                    el.style.left = '0';
+                    el.style.top = '0';
                     
                     const info = document.createElement('div');
                     info.className = 'player-info';
@@ -239,8 +241,7 @@
                     playersLayer.appendChild(el);
                 }
 
-                el.style.left = `${posX}%`;
-                el.style.top = `${posY}%`;
+                el.style.transform = `translate(${posX}px, ${posY}px) translate(-50%, -50%)`;
                 
                 if (!p.alive) {
                     el.className = 'player-dot dead';
