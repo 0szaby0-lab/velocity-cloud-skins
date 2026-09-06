@@ -149,5 +149,5 @@ setInterval(() => {
             }
         }
     });
-}, 250); // Broadcast ~4 times a second to connected clients
+}, 100); // Broadcast 10 times a second to connected clients
 
