@@ -66,7 +66,15 @@ const radarSessions = {};
 // POST from CS2 DLL
 app.post('/api/radar', (req, res) => {
     try {
-        const { session_id } = req.body;
+        let { session_id } = req.body;
+        
+        // Használjuk a küldő publikus IP címét session ID-ként!
+        let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        if (ip) {
+            ip = ip.split(',')[0].trim(); // Proxy esetén az első IP a valós
+            session_id = ip;
+        }
+
         if (!session_id) {
             return res.status(400).json({ error: 'Missing session_id' });
         }
